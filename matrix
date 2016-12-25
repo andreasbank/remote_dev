@@ -1,0 +1,107 @@
+#!/bin/bash
+# (append " -xv" to the above line to debug)
+#
+# Description:
+# A script that sets up a remote development
+# environment from your home linux PC.
+#
+# Author: Andreas Bank, andreas.mikael.bank@gmail.com
+# Last updated: 2016-11-05
+
+# Preparation steps:
+#
+# 1. If you do not have a ssh cert/key (~/.ssh/id_rsa[.pub]) run:
+# ssh-keygen -t rsa -b 4092 -C "<email>"
+#
+# 2. Setup a password-less way to connect to the ssh-gateway:
+# cat ~/.ssh/id_rsa.pub | ssh <username>@<ssh-gateway-url> "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+#
+# 2. Create a tunnel to work (now shouldn't require a password):
+# ssh -L2222:<internal-hostname>:22 <username>@<ssh-gateway-url>
+#
+# 3. In a new terminal open a tunneled connection to your PC at
+# work (requires a password):
+# ssh <username>@localhost -p2222
+# Now you are logged in to your machine at work in this terminal.
+#
+# 4. Setup a password-less way to connect to the PC at work by copy your local
+# public-key from your home PC, (open a new terminal):
+# cat ~/.ssh/id_rsa.pub
+# Copy the output and return to the previous temrinal and paste (append) it
+# into the ~/.ssh/authorized_keys file (on your work PC) using your favorite
+# editor. Exit all terminals.
+#
+# 5. As a last step make sure you also have a pasword-less way to connect to
+# your device (work PC to work device, not home PC to work device) following
+# the same process above. Otherwise some helper scripts (install.sh and
+# lcov_sc) may not work.
+
+###################
+# Configuration:
+#
+# Set to your username and computer hostname at work
+SSH_GATEWAY=<ssh-gateway>
+WORK_USERNAME=<username>
+WORK_HOSTNAME=<internal-hostname>
+# IP of the device
+WORK_TEST_IP=<test device ip>
+# The TTY of the serial-to-usb cable
+WORK_TEST_TTYUSB=1
+# The path to the project repository root
+WORK_REPO_DIR=<project path>
+# Set the desired ports you want to use
+SSH_PROXY_PORT=2222
+HTTP_PROXY_PORT=8090
+# The time to allow for ssh to establish the tunnel
+SSH_CONNECT_TIME=2
+# The gnome-terminal profile to use
+TAB_PROFILE=Default
+# The type of shell on the host to use
+HOST_SHELL=zsh
+# The command for accessing the serial port on the device
+DEBUG_CABLE_CMD="sudo sermon -b /dev/ttyUSB$WORK_TEST_TTYUSB 115200"
+#
+# End configuration
+###################
+
+# Proxy to ssh-gateway and forward
+# all on localhost:2222 to lnx<uname>:22
+TITLE[6]="*** Tunnel to work ***"
+CMD[6]="bash -c 'echo \"${TITLE[6]}\" && ssh -L$SSH_PROXY_PORT:$WORK_HOSTNAME:22 $WORK_USERNAME@$SSH_GATEWAY -p22; $HOST_SHELL'"
+
+# Create a proxy for the web-browser on localhost:8090
+TITLE[7]="*** HTTP proxy to work ***"
+INFO="Set your browser proxy configuration to SOCKS5 localhost:8090 to browse from within the work production network"
+CMD[7]="bash -c 'printf \"${TITLE[7]}\n$INFO\" && sleep $SSH_CONNECT_TIME && ssh -D$HTTP_PROXY_PORT -Nq $WORK_USERNAME@localhost -p$SSH_PROXY_PORT; $HOST_SHELL'"
+
+# Open new tab with a shell where the Addon SDK has been sourced
+TITLE[0]="*** Addon SDK ***"
+CMD[0]="bash -c 'echo \"${TITLE[0]}\" && sleep $SSH_CONNECT_TIME && ssh -t $WORK_USERNAME@localhost -p$SSH_PROXY_PORT \"cd ~/sdk3 && source environment-setup-mips32r2el-nf-poky-linux && cd $WORK_REPO_DIR; $HOST_SHELL\"'"
+
+# Open new tab with a shell for checktests
+TITLE[1]="*** Checktests ***"
+CMD[1]="bash -c 'echo \"${TITLE[1]}\" && sleep $SSH_CONNECT_TIME && ssh -t $WORK_USERNAME@localhost -p$SSH_PROXY_PORT \"cd $WORK_REPO_DIR/checktests; $HOST_SHELL\"'"
+
+# Open another shell for the "./install" command
+TITLE[2]="*** ./install ***"
+CMD[2]="bash -c 'echo \"${TITLE[2]}\" && sleep $SSH_CONNECT_TIME && ssh -t $WORK_USERNAME@localhost -p$SSH_PROXY_PORT \"export WORK_TEST_IP=$WORK_TEST_IP; $HOST_SHELL\"'"
+
+# Open another shell and monitor the device serial (debug) port
+TITLE[3]="*** Debug port ***"
+CMD[3]="bash -c 'echo \"${TITLE[3]}\" && sleep $SSH_CONNECT_TIME && ssh -t $WORK_USERNAME@localhost -p$SSH_PROXY_PORT \"$DEBUG_CABLE_CMD; $HOST_SHELL\"'"
+
+# Open another shell for the websocket test server
+TITLE[4]="*** WebSocket test server ***"
+CMD[4]="bash -c 'echo \"${TITLE[4]}\" && sleep $SSH_CONNECT_TIME && ssh -t $WORK_USERNAME@localhost -p$SSH_PROXY_PORT \"cd $WORK_REPO_DIR/websocket_test; $HOST_SHELL\"'"
+
+# Open another shell for the local "coverage" command
+TITLE[5]="*** ./coverage ***"
+CMD[5]="bash -c 'echo \"${TITLE[5]}\"; bash'"
+
+TERMINAL_TABS=""
+for i in 0 1 2 3 4 5 6 7; do
+	TERMINAL_TABS+=(--tab-with-profile=$TAB_PROFILE --title=\"${TITLE[$i]}\" -e "${CMD[$i]}")
+done
+
+gnome-terminal "${TERMINAL_TABS[@]}"
+exit 0

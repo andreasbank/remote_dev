@@ -1,0 +1,8 @@
+#!/bin/sh
+USERNAME=<enter username>
+PROJECT_PATH=<enter project path>
+
+ssh $USERNAME@localhost -p2222 -C "cd $PROJECT_PATH/checktests && make coverage\
+ && tar -czf /tmp/lcov.tar.gz lcov_html" && \
+ssh $USERNAME@localhost -p2222 cat > /tmp/lcov.tar.gz "<" /tmp/lcov.tar.gz && \
+tar -xzf /tmp/lcov.tar.gz -C /tmp/ && google-chrome /tmp/lcov_html/index.html &

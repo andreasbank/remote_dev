@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Make sure you have run this command once before using this script:
+# cat ~/.ssh/id_rsa.pub | ssh root@AXIS_TEST_IP "mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys"
+
+PACKAGE_PATH=<project path>
+PACKAGE_NAME=<package filename (.opk.tar.gz)>
+ssh root@$AXIS_TEST_IP cat < $PACKAGE_PATH$PACKAGE_NAME ">" /tmp/$PACKAGE_NAME
+ssh root@$AXIS_TEST_IP "addon-install /tmp/$PACKAGE_NAME"
+exit 0
